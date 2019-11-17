@@ -1,0 +1,35 @@
+function vokabelabfrage() 
+{
+  ui=SpreadsheetApp.getUi()
+  const sheet=SpreadsheetApp.getActiveSpreadsheet()
+  lastrow=sheet.getLastRow()
+  // begin of sorting. Create a sheet that is a randomly mixed copy of original
+  copy=sheet.duplicateActiveSheet()
+  sheet.renameActiveSheet("copy")
+  sheet.deleteRows(1,2)
+  sheet.insertColumnBefore(1)
+  random=Math.floor(Math.random()*lastrow)
+  for (zeile=1;zeile<=lastrow-2;zeile++) sheet.getRange('A'+zeile).setValue(Math.floor(Math.random()*lastrow))
+  sheet.sort(1)
+  sheet.deleteColumn(1)
+  // end of sorting
+  cover=sheet.insertSheet("cover")
+  for (zeile=3;zeile<=lastrow;zeile++)
+  {    
+    response=ui.prompt("Translate: " + sheet.getRange('copy!A'+zeile).getValue())
+    if ( response.getSelectedButton() == response.getSelectedButton().CLOSE )
+    {
+      zeile=lastrow+1
+    }
+    else
+    {
+      if (response.getResponseText()==sheet.getRange('copy!B'+zeile).getDisplayValue())
+      {
+        ui.alert("Correct!!!")
+      }
+      else ui.alert("Incorrect, it is: " + sheet.getRange('copy!B'+zeile).getDisplayValue())
+    }
+  }
+  sheet.deleteSheet(cover)
+  sheet.deleteSheet(copy)
+}
