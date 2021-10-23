@@ -1,35 +1,38 @@
-function vokabelabfrage() 
+function vocabulary_quiz() 
 {
   ui=SpreadsheetApp.getUi()
-  const sheet=SpreadsheetApp.getActiveSpreadsheet()
-  lastrow=sheet.getLastRow()
-  // begin of sorting. Create a sheet that is a randomly mixed copy of original
-  copy=sheet.duplicateActiveSheet()
-  sheet.renameActiveSheet("copy")
-  sheet.deleteRows(1,2)
-  sheet.insertColumnBefore(1)
-  random=Math.floor(Math.random()*lastrow)
-  for (zeile=1;zeile<=lastrow-2;zeile++) sheet.getRange('A'+zeile).setValue(Math.floor(Math.random()*lastrow))
-  sheet.sort(1)
-  sheet.deleteColumn(1)
-  // end of sorting
-  cover=sheet.insertSheet("cover")
-  for (zeile=3;zeile<=lastrow;zeile++)
+  const spreadsheet=SpreadsheetApp.getActiveSpreadsheet()
+  
+  if (spreadsheet.getSheetByName("sort")) SpreadsheetApp.getActiveSpreadsheet().deleteSheet(spreadsheet.getSheetByName("sort")) // this sheet is there to sort the vocabularies randomly
+  if (spreadsheet.getSheetByName("cover")) SpreadsheetApp.getActiveSpreadsheet().deleteSheet(spreadsheet.getSheetByName("cover")) // this sheet is there to cover the vocabularies so the user does not see them while being asked for them
+
+  lastrow=spreadsheet.getLastRow()
+  lastcol=spreadsheet.getLastColumn()
+  sort=spreadsheet.insertSheet("sort")
+  cover=spreadsheet.insertSheet("cover")
+  spreadsheet.getRange("A1").setValue('This is a cover sheet so you do not see the vocabularies :)')
+  
+  // shuffle vocabularies
+  spreadsheet.getSheetByName("Vokabeln").getRange(3,1,lastrow,lastcol).copyTo(spreadsheet.getSheetByName("sort").getRange(1,1,lastrow-2,lastcol)) // copy content of "Vokabeln" to "sort"
+  for (i=1;i<=lastrow-2;i++) spreadsheet.getSheetByName("sort").getRange(i,lastcol+1).setValue(Math.random())
+  spreadsheet.getSheetByName("sort").sort(lastcol+1)
+  
+  for (zeile=1;zeile<=lastrow-2;zeile++)
   {    
-    response=ui.prompt("Translate: " + sheet.getRange('copy!A'+zeile).getValue())
+    response=ui.prompt("Übersetze : " + spreadsheet.getRange('sort!A'+zeile).getValue())
     if ( response.getSelectedButton() == response.getSelectedButton().CLOSE )
     {
       zeile=lastrow+1
     }
     else
     {
-      if (response.getResponseText()==sheet.getRange('copy!B'+zeile).getDisplayValue())
+      if (response.getResponseText()==spreadsheet.getRange('sort!B'+zeile).getDisplayValue())
       {
-        ui.alert("Correct!!!")
+        spreadsheet.toast(response.getResponseText() + " is correct!!! You are a star!!!")
       }
-      else ui.alert("Incorrect, it is: " + sheet.getRange('copy!B'+zeile).getDisplayValue())
+      else ui.alert("Leider falsch, richtig wäre gewesen: " + spreadsheet.getRange('sort!B'+zeile).getDisplayValue())
     }
   }
-  sheet.deleteSheet(cover)
-  sheet.deleteSheet(copy)
+  spreadsheet.deleteSheet(cover)
+  spreadsheet.deleteSheet(sort)
 }
