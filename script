@@ -1,8 +1,80 @@
-function vocabulary_quiz() 
+/* 
+
+VOCTRAIN
+
+A vocabulary trainer written in Google AppScript for Google Sheets. You enter your vocabularies into a Google spreadsheet, then you run a function to do a quiz with you on the vocabularies.
+Instead of vocabularies you can also do math quizzes like 5*8 or 7*3. It's for school pupils in the 3rd to 8th grade.
+
+2022-09-18: now with extension menu entry and abort functionality
+2023-10-02: learned from test with my son that you should display the wrong answer to learn the difference to the right answer
+
+*/
+
+/**
+ * @OnlyCurrentDoc
+ *
+ * The above comment directs Apps Script to limit the scope of file
+ * access for this add-on. It specifies that this add-on will only
+ * attempt to read or modify the files in which the add-on is used,
+ * and not all of the user's files. The authorization request message
+ * presented to users will reflect this limited scope.
+ */
+
+/**
+ * Creates a menu entry in the Google Docs UI when the document is opened.
+ * This method is only used by the regular add-on, and is never called by
+ * the mobile add-on version.
+ *
+ * @param {object} e The event parameter for a simple onOpen trigger. To
+ *     determine which authorization mode (ScriptApp.AuthMode) the trigger is
+ *     running in, inspect e.authMode.
+ */
+function onOpen(e) 
+{
+  // Builds a menu that displays under the Extensions menu in Sheets.
+  let menu = SpreadsheetApp.getUi().createAddonMenu()
+
+  menu
+    .addItem('Start Vocabulary Quiz', 'vocabulary_quiz')
+    .addToUi();
+}
+
+
+/**
+ * Runs when the add-on is installed.
+ * This method is only used by the regular add-on, and is never called by
+ * the mobile add-on version.
+ *
+ * @param {object} e The event parameter for a simple onInstall trigger. To
+ *     determine which authorization mode (ScriptApp.AuthMode) the trigger is
+ *     running in, inspect e.authMode. (In practice, onInstall triggers always
+ *     run in AuthMode.FULL, but onOpen triggers may be AuthMode.LIMITED or
+ *     AuthMode.NONE.)
+ */
+function onInstall(e) 
+{
+  onOpen(e);
+}
+
+function onEdit(e)
 {
   ui=SpreadsheetApp.getUi()
-  const spreadsheet=SpreadsheetApp.getActiveSpreadsheet()
+  if (e.range.getA1Notation()=="F1") {vocabulary_quiz()}
+}
+
+function dateoutput()
+{
+  // just a function to play around with formatting the datime
+  Logger.log(Utilities.formatDate(new Date,"GMT", "yyyy-MM-dd';'HH:mm:ss"))
+}
+
+function vocabulary_quiz() 
+{
+  Logger.log("vocabulary_quiz started")
   
+  ui=SpreadsheetApp.getUi()
+  const spreadsheet=SpreadsheetApp.getActiveSpreadsheet()
+
   if (spreadsheet.getSheetByName("sort")) SpreadsheetApp.getActiveSpreadsheet().deleteSheet(spreadsheet.getSheetByName("sort")) // this sheet is there to sort the vocabularies randomly
   if (spreadsheet.getSheetByName("cover")) SpreadsheetApp.getActiveSpreadsheet().deleteSheet(spreadsheet.getSheetByName("cover")) // this sheet is there to cover the vocabularies so the user does not see them while being asked for them
 
@@ -13,26 +85,39 @@ function vocabulary_quiz()
   spreadsheet.getRange("A1").setValue('This is a cover sheet so you do not see the vocabularies :)')
   
   // shuffle vocabularies
-  spreadsheet.getSheetByName("Vokabeln").getRange(3,1,lastrow,lastcol).copyTo(spreadsheet.getSheetByName("sort").getRange(1,1,lastrow-2,lastcol)) // copy content of "Vokabeln" to "sort"
+  spreadsheet.getSheetByName("Vocabularies").getRange(3,1,lastrow,lastcol).copyTo(spreadsheet.getSheetByName("sort").getRange(1,1,lastrow-2,lastcol)) // copy content of "Vocabularies" to "sort"
   for (i=1;i<=lastrow-2;i++) spreadsheet.getSheetByName("sort").getRange(i,lastcol+1).setValue(Math.random())
   spreadsheet.getSheetByName("sort").sort(lastcol+1)
+
+  correctreplies=0
+  quizaborted=false
   
   for (zeile=1;zeile<=lastrow-2;zeile++)
   {    
-    response=ui.prompt("Übersetze : " + spreadsheet.getRange('sort!A'+zeile).getValue())
+    response=ui.prompt(spreadsheet.getRange('sort!A'+zeile).getValue())
     if ( response.getSelectedButton() == response.getSelectedButton().CLOSE )
     {
       zeile=lastrow+1
+      quizaborted=true
     }
     else
     {
       if (response.getResponseText()==spreadsheet.getRange('sort!B'+zeile).getDisplayValue())
       {
         spreadsheet.toast(response.getResponseText() + " is correct!!! You are a star!!!")
+        spreadsheet.getSheetByName("sort").getRange(zeile,lastcol+1).setValue("correct")
+        correctreplies+=1
       }
-      else ui.alert("Leider falsch, richtig wäre gewesen: " + spreadsheet.getRange('sort!B'+zeile).getDisplayValue())
+      else ui.alert("Wrong, you wrote: " + response.getResponseText() + "\nhere is the right answer: " + spreadsheet.getRange('sort!B'+zeile).getDisplayValue())
     }
-  }
+  } 
+  spreadsheet.setActiveSheet(spreadsheet.getSheetByName("sort"))
+
+  // the following line would keep a tab for every quiz, goal was that you would be able to evaluate later how many mistakes you made when, 
+  // but it prooved to be too confusing
+  // spreadsheet.renameActiveSheet(Utilities.formatDate(new Date,"GMT", "yyyy-MM-dd';'HH:mm:ss"))
+  
+  spreadsheet.setActiveSheet(spreadsheet.getSheetByName("Vocabularies"))
   spreadsheet.deleteSheet(cover)
-  spreadsheet.deleteSheet(sort)
+  if (!quizaborted) {ui.alert("Correct answers:" + correctreplies + " out of " + (lastrow-2) )}
 }
