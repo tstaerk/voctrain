@@ -7,6 +7,13 @@ Instead of vocabularies you can also do math quizzes like 5*8 or 7*3. It's for s
 
 2022-09-18: now with extension menu entry and abort functionality
 2023-10-02: learned from test with my son that you should display the wrong answer to learn the difference to the right answer
+2024-04-02: the vocabularies tab now contains
+column A: the prompt, for example "walk" or "2+2"
+column B: the expected response, for example "laufen" or "4"
+column C: the amount of times this has been answered correctly so far
+column D: the amount of times this has been answered wrongly so far
+column E,G,I,...: synonyms for the prompt, for future versions, for example "go" or "run"
+column F,H,J,...: synonyms for the response, for future versions, for example "gehen" or "rennen"
 
 */
 
@@ -68,6 +75,18 @@ function dateoutput()
   Logger.log(Utilities.formatDate(new Date,"GMT", "yyyy-MM-dd';'HH:mm:ss"))
 }
 
+function getvalue(myrange)
+// myrange can be sort!D2 or so
+{
+  return SpreadsheetApp.getActiveSpreadsheet().getRange(myrange).getDisplayValue()
+}
+
+function setvalue(myrange, myvalue)
+// myrange can be sort!D2 or so
+{
+  SpreadsheetApp.getActiveSpreadsheet().getRange(myrange).setValue(myvalue)
+}
+
 function vocabulary_quiz() 
 {
   Logger.log("vocabulary_quiz started")
@@ -78,40 +97,64 @@ function vocabulary_quiz()
   if (spreadsheet.getSheetByName("sort")) SpreadsheetApp.getActiveSpreadsheet().deleteSheet(spreadsheet.getSheetByName("sort")) // this sheet is there to sort the vocabularies randomly
   if (spreadsheet.getSheetByName("cover")) SpreadsheetApp.getActiveSpreadsheet().deleteSheet(spreadsheet.getSheetByName("cover")) // this sheet is there to cover the vocabularies so the user does not see them while being asked for them
 
-  lastrow=spreadsheet.getLastRow()
+  lastrow=spreadsheet.getSheetByName("Vocabularies").getLastRow()
+
   lastcol=spreadsheet.getLastColumn()
   sort=spreadsheet.insertSheet("sort")
   cover=spreadsheet.insertSheet("cover")
-  spreadsheet.getRange("A1").setValue('This is a cover sheet so you do not see the vocabularies :)')
+  setvalue("cover!A1",'This is a cover sheet so you do not see the vocabularies :)')
   
   // shuffle vocabularies
-  spreadsheet.getSheetByName("Vocabularies").getRange(3,1,lastrow,lastcol).copyTo(spreadsheet.getSheetByName("sort").getRange(1,1,lastrow-2,lastcol)) // copy content of "Vocabularies" to "sort"
-  for (i=1;i<=lastrow-2;i++) spreadsheet.getSheetByName("sort").getRange(i,lastcol+1).setValue(Math.random())
-  spreadsheet.getSheetByName("sort").sort(lastcol+1)
+  spreadsheet.getSheetByName("Vocabularies").getRange(3,1,lastrow,lastcol).copyTo(sort.getRange(1,1,lastrow-2,lastcol)) // copy content of "Vocabularies" to "sort"
 
+  // last colum reflects which row this is in the original sheet
+  for (i=1;i<=lastrow-2;i++) sort.getRange(i,5).setValue(i)
+
+  for (i=1;i<=lastrow-2;i++) sort.getRange(i,6).setValue(sort.getRange(i,3).getValue()/(sort.getRange(i,4).getValue()+Math.random()))
+  sort.sort(6)
   correctreplies=0
   quizaborted=false
   
-  for (zeile=1;zeile<=lastrow-2;zeile++)
+  for (row=1;row<=lastrow-2;row++)
   {    
-    response=ui.prompt(spreadsheet.getRange('sort!A'+zeile).getValue())
+    response=ui.prompt(spreadsheet.getRange('sort!A'+row).getValue())
     if ( response.getSelectedButton() == response.getSelectedButton().CLOSE )
     {
-      zeile=lastrow+1
+      row=lastrow+1
       quizaborted=true
     }
     else
     {
-      if (response.getResponseText()==spreadsheet.getRange('sort!B'+zeile).getDisplayValue())
+      if (response.getResponseText()==spreadsheet.getRange('sort!B'+row).getDisplayValue())
       {
         spreadsheet.toast(response.getResponseText() + " is correct!!! You are a star!!!")
-        spreadsheet.getSheetByName("sort").getRange(zeile,lastcol+1).setValue("correct")
+
+        // correctreplies: at the end of the quiz, tell the user how many correct replies they had
         correctreplies+=1
+
+        // correctcount: for every vocabulary, store a number how often it has been answered correctly
+        // correctcount is stored on rownumber. Rownumber is stored on sort!C
+        rownumber=spreadsheet.getSheetByName("sort").getRange('sort!E'+row).getDisplayValue()
+        rownumber=Number(rownumber)+2
+        correctcount=spreadsheet.getSheetByName("Vocabularies").getRange('Vocabularies!C'+rownumber).getDisplayValue()
+        if (correctcount=="") correctcount="1"
+        else correctcount=Number(correctcount)+1
+        spreadsheet.getSheetByName("Vocabularies").getRange('Vocabularies!C'+rownumber).setValue(correctcount)
       }
-      else ui.alert("Wrong, you wrote: " + response.getResponseText() + "\nhere is the right answer: " + spreadsheet.getRange('sort!B'+zeile).getDisplayValue())
+      else 
+      {
+        ui.alert("Wrong, you wrote: " + response.getResponseText() + "\nhere is the right answer: " + spreadsheet.getRange('sort!B'+row).getDisplayValue())
+        // wrongcount: for every vocabulary, store a number how often it has been answered wrongly
+        // wrongcount is stored on rownumber. Rownumber is stored on sort!C
+        rownumber=spreadsheet.getSheetByName("sort").getRange('sort!E'+row).getDisplayValue()
+        rownumber=Number(rownumber)+2
+        wrongcount=getvalue('Vocabularies!D'+rownumber)
+        if (wrongcount=="") wrongcount="1"
+        else wrongcount=Number(wrongcount)+1
+        setvalue('Vocabularies!D'+rownumber,wrongcount)
+      }
     }
-  } 
-  spreadsheet.setActiveSheet(spreadsheet.getSheetByName("sort"))
+  }
 
   // the following line would keep a tab for every quiz, goal was that you would be able to evaluate later how many mistakes you made when, 
   // but it prooved to be too confusing
